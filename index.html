@@ -1,0 +1,1163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Smart Canopy OS | Real-time IoT Telemetry & Actuator Simulation</title>
+  <meta name="description" content="Real-time IoT telemetry dashboard and physical twin simulation for ESP32 Smart Shadow Canopy with automated solar shielding and drip irrigation.">
+  
+  <!-- Google Fonts: Outfit for sleek modern UI, JetBrains Mono for telemetry code -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  
+  <!-- Chart.js and Paho MQTT via CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.min.js"></script>
+  
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <!-- Ambient Glow Background Canvas -->
+  <div class="ambient-bg-glow"></div>
+
+  <!-- Top Navigation & Status Bar -->
+  <header class="app-header">
+    <div class="brand-group">
+      <div class="logo-orb">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/>
+          <circle cx="12" cy="12" r="5"/>
+        </svg>
+      </div>
+      <div class="brand-text">
+        <h1>CANOPY<span>.OS</span></h1>
+        <div class="brand-sub">Smart Shadow Canopy & Agro-Irrigation System</div>
+      </div>
+    </div>
+
+    <!-- Live Connection Status Pill -->
+    <div class="telemetry-source-badge" id="sourceBadge">
+      <div class="status-indicator-dot" id="statusDot"></div>
+      <div class="source-info">
+        <span class="source-mode-text" id="sourceModeText">MQTT: CONNECTING...</span>
+        <span class="source-sub-text" id="sourceSubText">broker.hivemq.com:8884</span>
+      </div>
+    </div>
+
+    <!-- Quick Actions Header -->
+    <div class="header-actions">
+      <!-- Mode Toggle: Live MQTT vs Interactive Simulator -->
+      <div class="mode-switch-wrapper">
+        <button id="modeLiveBtn" class="mode-btn active" title="Listen to real ESP32 Wokwi / Hardware via MQTT">
+          <span class="icon">📡</span> Live MQTT
+        </button>
+        <button id="modeSimBtn" class="mode-btn" title="Run Interactive Physics & Sensor Simulator">
+          <span class="icon">🎛️</span> Simulator
+        </button>
+      </div>
+
+      <button id="btnSoundToggle" class="icon-btn" title="Toggle Audio Sound FX" aria-label="Toggle Sound">
+        <span id="soundIcon">🔊</span>
+      </button>
+
+      <button id="btnConfigMqtt" class="icon-btn" title="Configure MQTT Broker & Topic" aria-label="MQTT Settings">
+        <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none">
+          <circle cx="12" cy="12" r="3"></circle>
+          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+        </svg>
+      </button>
+
+      <button id="btnCalibrate" class="icon-btn" title="Thresholds & Rules" aria-label="Threshold Calibration">
+        <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none">
+          <line x1="4" y1="21" x2="4" y2="14"></line>
+          <line x1="4" y1="10" x2="4" y2="3"></line>
+          <line x1="12" y1="21" x2="12" y2="12"></line>
+          <line x1="12" y1="8" x2="12" y2="3"></line>
+          <line x1="20" y1="21" x2="20" y2="16"></line>
+          <line x1="20" y1="12" x2="20" y2="3"></line>
+          <line x1="1" y1="14" x2="7" y2="14"></line>
+          <line x1="9" y1="8" x2="15" y2="8"></line>
+          <line x1="17" y1="16" x2="23" y2="16"></line>
+        </svg>
+      </button>
+
+      <button id="btnWokwiGuide" class="btn-primary-outline" title="Wokwi ESP32 Setup Guide">
+        <span>⚡ Wokwi Setup</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- Main Container -->
+  <main class="dashboard-main">
+    
+    <!-- TOP ROW: PHYSICAL TWIN INTERACTIVE VISUALIZER -->
+    <section class="simulation-stage-card">
+      <div class="card-header-flex">
+        <div class="stage-title-wrap">
+          <span class="badge-pill pulse-badge" id="simModeBadge">LIVE PHYSICAL TWIN</span>
+          <h2>Canopy Field Simulation & Actuator State</h2>
+        </div>
+        <div class="stage-stats-strip">
+          <div class="stat-mini">
+            <span class="lbl">Canopy Awning:</span>
+            <span class="val" id="miniCanopyVal">0° (OPEN)</span>
+          </div>
+          <div class="stat-mini">
+            <span class="lbl">Drip Pump:</span>
+            <span class="val" id="miniPumpVal">OFF</span>
+          </div>
+          <div class="stat-mini">
+            <span class="lbl">Telemetry Uptime:</span>
+            <span class="val mono" id="miniUptimeVal">00:00:00</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- VISUAL STAGE GRAPHICS -->
+      <div class="physical-twin-viewport" id="twinViewport">
+        <!-- Sky & Atmospheric Lighting Backdrop -->
+        <div class="sky-backdrop" id="skyBackdrop">
+          <!-- Dynamic Sun Orb -->
+          <div class="sun-orb" id="sunOrb">
+            <div class="sun-glow-core"></div>
+            <div class="sun-flare-ring"></div>
+            <div class="sun-rays-pulse"></div>
+          </div>
+          <!-- Heat Wave Distortions -->
+          <div class="heat-waves-container" id="heatWavesContainer">
+            <div class="heat-wave wave-1"></div>
+            <div class="heat-wave wave-2"></div>
+            <div class="heat-wave wave-3"></div>
+          </div>
+          <!-- Rain / Mist Particles Container -->
+          <div class="weather-particles" id="weatherParticles"></div>
+        </div>
+
+        <!-- SVG Mechanical Canopy & Plant System -->
+        <svg class="canopy-scene-svg" viewBox="0 0 1000 480" preserveAspectRatio="xMidYMid meet">
+          <defs>
+            <!-- Linear Gradients for Frame and Louvers -->
+            <linearGradient id="metalPillar" x1="0%" y1="0%" x2="100%" y2="0%">
+              <stop offset="0%" stop-color="#1e293b"/>
+              <stop offset="50%" stop-color="#475569"/>
+              <stop offset="100%" stop-color="#0f172a"/>
+            </linearGradient>
+            <linearGradient id="canopyFabricOpen" x1="0%" y1="0%" x2="0%" y2="100%">
+              <stop offset="0%" stop-color="#38bdf8" stop-opacity="0.85"/>
+              <stop offset="100%" stop-color="#0284c7" stop-opacity="0.95"/>
+            </linearGradient>
+            <linearGradient id="canopyFabricClosed" x1="0%" y1="0%" x2="0%" y2="100%">
+              <stop offset="0%" stop-color="#0ea5e9" stop-opacity="0.95"/>
+              <stop offset="100%" stop-color="#0369a1" stop-opacity="0.98"/>
+            </linearGradient>
+            <linearGradient id="soilGradientDry" x1="0%" y1="0%" x2="0%" y2="100%">
+              <stop offset="0%" stop-color="#a16207"/>
+              <stop offset="40%" stop-color="#713f12"/>
+              <stop offset="100%" stop-color="#422006"/>
+            </linearGradient>
+            <linearGradient id="soilGradientMoist" x1="0%" y1="0%" x2="0%" y2="100%">
+              <stop offset="0%" stop-color="#451a03"/>
+              <stop offset="40%" stop-color="#291204"/>
+              <stop offset="100%" stop-color="#140801"/>
+            </linearGradient>
+            <linearGradient id="waterPipeFlow" x1="0%" y1="0%" x2="100%" y2="0%">
+              <stop offset="0%" stop-color="#0284c7"/>
+              <stop offset="50%" stop-color="#38bdf8"/>
+              <stop offset="100%" stop-color="#0284c7"/>
+            </linearGradient>
+
+            <filter id="shadowFilter" x="-20%" y="-20%" width="140%" height="140%">
+              <feGaussianBlur in="SourceAlpha" stdDeviation="10"/>
+              <feOffset dx="0" dy="14" result="offsetblur"/>
+              <feFlood flood-color="rgba(0,0,0,0.6)"/>
+              <feComposite in2="offsetblur" operator="in"/>
+              <feMerge>
+                <feMergeNode/>
+                <feMergeNode in="SourceGraphic"/>
+              </feMerge>
+            </filter>
+            <filter id="neonGlow" x="-50%" y="-50%" width="200%" height="200%">
+              <feGaussianBlur stdDeviation="4" result="coloredBlur"/>
+              <feMerge>
+                <feMergeNode in="coloredBlur"/>
+                <feMergeNode in="SourceGraphic"/>
+              </feMerge>
+            </filter>
+          </defs>
+
+          <!-- Dynamic Soft Ground Shadow cast by Canopy when deployed -->
+          <ellipse id="canopyGroundShadow" cx="500" cy="385" rx="360" ry="24" fill="#000000" opacity="0.15" class="transition-shadow" />
+
+          <!-- Background Soil Bed Base -->
+          <path d="M 120 370 Q 500 360 880 370 L 910 470 L 90 470 Z" id="soilBedPath" fill="url(#soilGradientDry)" class="transition-soil" />
+          <path d="M 120 370 Q 500 360 880 370" stroke="#ca8a04" stroke-width="3" stroke-dasharray="8 6" opacity="0.4" id="soilCracks"/>
+
+          <!-- Plant Crop Group (Responsive Healthy vs Wilting) -->
+          <g id="cropPlantsGroup" transform="translate(0, 0)">
+            <!-- Crop 1 (Left) -->
+            <g class="crop-plant" transform="translate(280, 368)">
+              <path class="plant-stem" d="M 0 0 Q -5 -35 0 -65 Q 5 -35 0 0" fill="#15803d" />
+              <path class="plant-leaf leaf-left" d="M -2 -30 Q -40 -45 -55 -25 Q -35 -15 -2 -25" fill="#22c55e" />
+              <path class="plant-leaf leaf-right" d="M 2 -40 Q 40 -55 60 -35 Q 35 -25 2 -35" fill="#16a34a" />
+              <path class="plant-leaf leaf-top" d="M 0 -65 Q -15 -100 0 -115 Q 15 -100 0 -65" fill="#4ade80" />
+            </g>
+            <!-- Crop 2 (Center Hero Plant) -->
+            <g class="crop-plant" transform="translate(500, 365)">
+              <path class="plant-stem" d="M 0 0 Q -8 -45 0 -85 Q 8 -45 0 0" fill="#15803d" />
+              <path class="plant-leaf leaf-left" d="M -3 -38 Q -55 -60 -75 -35 Q -45 -20 -3 -30" fill="#22c55e" />
+              <path class="plant-leaf leaf-right" d="M 3 -50 Q 55 -72 80 -45 Q 45 -30 3 -42" fill="#16a34a" />
+              <path class="plant-leaf leaf-top" d="M 0 -85 Q -20 -130 0 -150 Q 20 -130 0 -85" fill="#4ade80" />
+            </g>
+            <!-- Crop 3 (Right) -->
+            <g class="crop-plant" transform="translate(720, 368)">
+              <path class="plant-stem" d="M 0 0 Q 5 -35 0 -65 Q -5 -35 0 0" fill="#15803d" />
+              <path class="plant-leaf leaf-left" d="M -2 -40 Q -40 -55 -60 -35 Q -35 -25 -2 -35" fill="#16a34a" />
+              <path class="plant-leaf leaf-right" d="M 2 -30 Q 40 -45 55 -25 Q 35 -15 2 -25" fill="#22c55e" />
+              <path class="plant-leaf leaf-top" d="M 0 -65 Q -15 -100 0 -115 Q 15 -100 0 -65" fill="#4ade80" />
+            </g>
+          </g>
+
+          <!-- Drip Irrigation Pipe System -->
+          <g id="irrigationPipes">
+            <!-- Main Horizontal Drip Header Line -->
+            <line x1="160" y1="362" x2="840" y2="362" stroke="#334155" stroke-width="7" stroke-linecap="round"/>
+            <line id="waterPulseLine" x1="160" y1="362" x2="840" y2="362" stroke="url(#waterPipeFlow)" stroke-width="4" stroke-linecap="round" opacity="0.2"/>
+            
+            <!-- Drip Emitters -->
+            <circle cx="280" cy="362" r="5" fill="#0284c7" />
+            <circle cx="500" cy="362" r="5" fill="#0284c7" />
+            <circle cx="720" cy="362" r="5" fill="#0284c7" />
+
+            <!-- Animated Water Droplets from Emitters (Triggered on Pump ON) -->
+            <g id="waterDropletsGroup" class="droplets-hidden">
+              <ellipse cx="280" cy="372" rx="3" ry="5" fill="#38bdf8" class="water-drop drop-1" />
+              <ellipse cx="500" cy="372" rx="3.5" ry="6" fill="#38bdf8" class="water-drop drop-2" />
+              <ellipse cx="720" cy="372" rx="3" ry="5" fill="#38bdf8" class="water-drop drop-3" />
+            </g>
+
+            <!-- Soil Moisture Sensor Probe (Pin 35) in Ground -->
+            <g id="soilProbePin" transform="translate(610, 345)">
+              <rect x="-6" y="0" width="12" height="42" rx="2" fill="#e2e8f0" stroke="#0f172a" stroke-width="1.5"/>
+              <line x1="-3" y1="12" x2="-3" y2="38" stroke="#f59e0b" stroke-width="2"/>
+              <line x1="3" y1="12" x2="3" y2="38" stroke="#f59e0b" stroke-width="2"/>
+              <!-- Probe Signal wire to ESP32 -->
+              <path d="M 0 0 C 0 -40 220 -80 230 -130" stroke="#f97316" stroke-width="2" stroke-dasharray="3 3" fill="none" opacity="0.6"/>
+              <circle cx="0" cy="0" r="4" fill="#f97316" />
+            </g>
+          </g>
+
+          <!-- Water Reservoir & Electric Pump Unit (Pin 19) -->
+          <g id="pumpUnit" transform="translate(130, 310)">
+            <!-- Water Tank Reservoir -->
+            <rect x="-45" y="-55" width="40" height="95" rx="5" fill="#0f172a" stroke="#334155" stroke-width="2"/>
+            <rect x="-42" y="-10" width="34" height="45" rx="3" fill="#0284c7" opacity="0.6" id="tankWaterLevel"/>
+            <line x1="-50" y1="40" x2="0" y2="40" stroke="#475569" stroke-width="4"/>
+            <!-- Water Pump Enclosure -->
+            <rect x="-5" y="10" width="36" height="34" rx="4" fill="#1e293b" stroke="#38bdf8" stroke-width="2" id="pumpHousing"/>
+            <!-- Rotating Impeller Blade Icon -->
+            <g id="pumpImpeller" transform="translate(13, 27)">
+              <circle cx="0" cy="0" r="10" fill="#0f172a" />
+              <line x1="-8" y1="0" x2="8" y2="0" stroke="#38bdf8" stroke-width="2.5" />
+              <line x1="0" y1="-8" x2="0" y2="8" stroke="#38bdf8" stroke-width="2.5" />
+            </g>
+            <!-- Pump Status LED Badge -->
+            <circle cx="23" cy="18" r="3.5" fill="#64748b" id="pumpLedDot"/>
+            <text x="13" y="58" font-family="'JetBrains Mono', monospace" font-size="10" fill="#94a3b8" text-anchor="middle">PUMP PIN 19</text>
+          </g>
+
+          <!-- CANOPY PERGOLA / STRUCTURAL FRAME -->
+          <!-- Vertical Support Pillars -->
+          <rect x="180" y="140" width="16" height="235" rx="3" fill="url(#metalPillar)" stroke="#334155" stroke-width="1.5"/>
+          <rect x="804" y="140" width="16" height="235" rx="3" fill="url(#metalPillar)" stroke="#334155" stroke-width="1.5"/>
+          <rect x="175" y="370" width="26" height="8" rx="2" fill="#475569"/>
+          <rect x="799" y="370" width="26" height="8" rx="2" fill="#475569"/>
+
+          <!-- Top Crossbeam Truss -->
+          <rect x="160" y="130" width="680" height="16" rx="4" fill="url(#metalPillar)" stroke="#334155" stroke-width="2" filter="url(#shadowFilter)"/>
+          <line x1="180" y1="138" x2="820" y2="138" stroke="#64748b" stroke-width="2" stroke-dasharray="16 12" />
+
+          <!-- Canopy Servo Motor Box (Pin 18) -->
+          <g id="servoMotorUnit" transform="translate(195, 115)">
+            <rect x="-24" y="-15" width="48" height="30" rx="4" fill="#090d16" stroke="#8b5cf6" stroke-width="2"/>
+            <!-- Servo Horn & Gear Pivot -->
+            <circle cx="12" cy="0" r="9" fill="#1e1b4b" stroke="#a78bfa" stroke-width="2"/>
+            <g id="servoHornArm" transform="rotate(0, 12, 0)">
+              <line x1="12" y1="0" x2="26" y2="0" stroke="#c084fc" stroke-width="4" stroke-linecap="round"/>
+              <circle cx="26" cy="0" r="3" fill="#ffffff"/>
+            </g>
+            <text x="0" y="-20" font-family="'JetBrains Mono', monospace" font-size="10" fill="#c084fc" text-anchor="middle">SERVO PIN 18</text>
+          </g>
+
+          <!-- LDR Light Sensor Mount (Pin 34) on top roof -->
+          <g id="ldrSensorUnit" transform="translate(500, 110)">
+            <rect x="-20" y="-8" width="40" height="16" rx="3" fill="#1e293b" stroke="#eab308" stroke-width="1.5"/>
+            <!-- LDR Cell Wave Pattern -->
+            <circle cx="0" cy="0" r="6" fill="#713f12" stroke="#eab308" stroke-width="1"/>
+            <path d="M -3 -3 Q 0 0 -3 3 M 3 -3 Q 0 0 3 3" stroke="#facc15" stroke-width="1.5" fill="none"/>
+            <text x="0" y="-14" font-family="'JetBrains Mono', monospace" font-size="10" fill="#facc15" text-anchor="middle">LDR PIN 34</text>
+          </g>
+
+          <!-- DHT22 Temp & Humidity Sensor Unit (Pin 15) suspended in shade -->
+          <g id="dhtSensorUnit" transform="translate(760, 160)">
+            <rect x="-14" y="-18" width="28" height="36" rx="3" fill="#f8fafc" stroke="#0ea5e9" stroke-width="2"/>
+            <!-- DHT Grille Vents -->
+            <line x1="-8" y1="-8" x2="8" y2="-8" stroke="#94a3b8" stroke-width="2"/>
+            <line x1="-8" y1="-2" x2="8" y2="-2" stroke="#94a3b8" stroke-width="2"/>
+            <line x1="-8" y1="4" x2="8" y2="4" stroke="#94a3b8" stroke-width="2"/>
+            <circle cx="0" cy="11" r="2.5" fill="#0284c7"/>
+            <text x="0" y="30" font-family="'JetBrains Mono', monospace" font-size="10" fill="#38bdf8" text-anchor="middle">DHT22 PIN 15</text>
+          </g>
+
+          <!-- MOTORIZED ROTATING CANOPY AWNING / LOUVER SLATS (Controlled by Servo Angle 0° - 90°) -->
+          <!-- We animate the slats rotation and translation smoothly via CSS / JS transform -->
+          <g id="canopyLouversMaster" transform="translate(0, 0)">
+            <!-- Louver Slats (Repeated across canopy span: x from 240 to 760) -->
+            <!-- Slat 1 -->
+            <g class="canopy-louver" transform="translate(240, 130)">
+              <rect class="louver-blade" x="-6" y="-3" width="70" height="12" rx="3" fill="url(#canopyFabricOpen)" stroke="#0284c7" stroke-width="1.5"/>
+              <circle cx="0" cy="3" r="3.5" fill="#38bdf8" />
+            </g>
+            <!-- Slat 2 -->
+            <g class="canopy-louver" transform="translate(305, 130)">
+              <rect class="louver-blade" x="-6" y="-3" width="70" height="12" rx="3" fill="url(#canopyFabricOpen)" stroke="#0284c7" stroke-width="1.5"/>
+              <circle cx="0" cy="3" r="3.5" fill="#38bdf8" />
+            </g>
+            <!-- Slat 3 -->
+            <g class="canopy-louver" transform="translate(370, 130)">
+              <rect class="louver-blade" x="-6" y="-3" width="70" height="12" rx="3" fill="url(#canopyFabricOpen)" stroke="#0284c7" stroke-width="1.5"/>
+              <circle cx="0" cy="3" r="3.5" fill="#38bdf8" />
+            </g>
+            <!-- Slat 4 -->
+            <g class="canopy-louver" transform="translate(435, 130)">
+              <rect class="louver-blade" x="-6" y="-3" width="70" height="12" rx="3" fill="url(#canopyFabricOpen)" stroke="#0284c7" stroke-width="1.5"/>
+              <circle cx="0" cy="3" r="3.5" fill="#38bdf8" />
+            </g>
+            <!-- Slat 5 -->
+            <g class="canopy-louver" transform="translate(500, 130)">
+              <rect class="louver-blade" x="-6" y="-3" width="70" height="12" rx="3" fill="url(#canopyFabricOpen)" stroke="#0284c7" stroke-width="1.5"/>
+              <circle cx="0" cy="3" r="3.5" fill="#38bdf8" />
+            </g>
+            <!-- Slat 6 -->
+            <g class="canopy-louver" transform="translate(565, 130)">
+              <rect class="louver-blade" x="-6" y="-3" width="70" height="12" rx="3" fill="url(#canopyFabricOpen)" stroke="#0284c7" stroke-width="1.5"/>
+              <circle cx="0" cy="3" r="3.5" fill="#38bdf8" />
+            </g>
+            <!-- Slat 7 -->
+            <g class="canopy-louver" transform="translate(630, 130)">
+              <rect class="louver-blade" x="-6" y="-3" width="70" height="12" rx="3" fill="url(#canopyFabricOpen)" stroke="#0284c7" stroke-width="1.5"/>
+              <circle cx="0" cy="3" r="3.5" fill="#38bdf8" />
+            </g>
+            <!-- Slat 8 -->
+            <g class="canopy-louver" transform="translate(695, 130)">
+              <rect class="louver-blade" x="-6" y="-3" width="70" height="12" rx="3" fill="url(#canopyFabricOpen)" stroke="#0284c7" stroke-width="1.5"/>
+              <circle cx="0" cy="3" r="3.5" fill="#38bdf8" />
+            </g>
+            <!-- Slat 9 -->
+            <g class="canopy-louver" transform="translate(760, 130)">
+              <rect class="louver-blade" x="-6" y="-3" width="60" height="12" rx="3" fill="url(#canopyFabricOpen)" stroke="#0284c7" stroke-width="1.5"/>
+              <circle cx="0" cy="3" r="3.5" fill="#38bdf8" />
+            </g>
+
+            <!-- Connecting Tie-Rod Linkage linking all slats to Servo Horn -->
+            <line id="servoTieRod" x1="220" y1="125" x2="820" y2="125" stroke="#93c5fd" stroke-width="3" stroke-linecap="round" opacity="0.8"/>
+          </g>
+
+          <!-- Canopy State Status Banner floating in viewport -->
+          <g id="viewportHudStatus" transform="translate(500, 40)">
+            <rect x="-160" y="-18" width="320" height="36" rx="18" fill="rgba(15, 23, 42, 0.85)" stroke="#38bdf8" stroke-width="1.5" filter="url(#shadowFilter)"/>
+            <circle cx="-135" cy="0" r="5" fill="#22c55e" id="hudStateDot"/>
+            <text x="-120" y="4" font-family="'Outfit', sans-serif" font-weight="600" font-size="13" fill="#f8fafc" id="hudStateText">CANOPY RETRACTED (0°) • SUNLIGHT ACTIVE</text>
+          </g>
+        </svg>
+
+        <!-- Dynamic Viewport Overlays (Solar intensity, Heat warnings) -->
+        <div class="viewport-hud-tags">
+          <div class="hud-tag hud-tag-sun" id="hudSunTag">
+            <span class="icon">☀️</span>
+            <span class="val" id="hudSunVal">LDR: 2,500</span>
+          </div>
+          <div class="hud-tag hud-tag-temp" id="hudTempTag">
+            <span class="icon">🌡️</span>
+            <span class="val" id="hudTempVal">35.0 °C</span>
+          </div>
+          <div class="hud-tag hud-tag-soil" id="hudSoilTag">
+            <span class="icon">🌱</span>
+            <span class="val" id="hudSoilVal">Soil: 1,400</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- MIDDLE ROW: 4 SENSOR METRICS HERO CARDS -->
+    <section class="telemetry-grid">
+      
+      <!-- CARD 1: LIGHT SENSOR (LDR PIN 34) -->
+      <article class="metric-card metric-card-light" id="cardLight">
+        <div class="card-top">
+          <div class="metric-meta">
+            <div class="metric-icon-wrap icon-amber">
+              <svg viewBox="0 0 24 24" width="22" height="22" stroke="currentColor" stroke-width="2" fill="none">
+                <circle cx="12" cy="12" r="5"></circle>
+                <line x1="12" y1="1" x2="12" y2="3"></line>
+                <line x1="12" y1="21" x2="12" y2="23"></line>
+                <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+                <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+                <line x1="1" y1="12" x2="3" y2="12"></line>
+                <line x1="21" y1="12" x2="23" y2="12"></line>
+                <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+                <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+              </svg>
+            </div>
+            <div>
+              <h3>Solar Irradiance (LDR)</h3>
+              <span class="pin-tag">Analog Pin 34 • 12-bit ADC</span>
+            </div>
+          </div>
+          <span class="status-chip chip-normal" id="lightChip">OPTIMAL</span>
+        </div>
+
+        <div class="metric-hero-value">
+          <span class="primary-number mono" id="lightValue">2,500</span>
+          <span class="unit-label">ADC</span>
+        </div>
+        <div class="secondary-estimate" id="lightLuxEstimate">≈ 61,200 Lux (Direct Sunlight)</div>
+
+        <!-- Progress Gauge Bar with Threshold Pointer -->
+        <div class="gauge-bar-wrapper">
+          <div class="gauge-track">
+            <div class="gauge-fill gauge-fill-light" id="lightBarFill" style="width: 61%;"></div>
+            <div class="threshold-marker marker-light" id="lightMarker" style="left: 61%;" title="Canopy Close Threshold (2500 ADC)">
+              <span class="marker-flag">2500</span>
+            </div>
+          </div>
+          <div class="gauge-scale-labels">
+            <span>0 (Dark)</span>
+            <span>Threshold: 2500</span>
+            <span>4095 (Blazing)</span>
+          </div>
+        </div>
+
+        <div class="metric-footer-note" id="lightDecisionNote">
+          <span class="bullet-dot"></span> Shade closes if Light &gt; 2500
+        </div>
+      </article>
+
+      <!-- CARD 2: SOIL MOISTURE (PIN 35) -->
+      <article class="metric-card metric-card-soil" id="cardSoil">
+        <div class="card-top">
+          <div class="metric-meta">
+            <div class="metric-icon-wrap icon-emerald">
+              <svg viewBox="0 0 24 24" width="22" height="22" stroke="currentColor" stroke-width="2" fill="none">
+                <path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"></path>
+              </svg>
+            </div>
+            <div>
+              <h3>Soil Moisture Sensor</h3>
+              <span class="pin-tag">Analog Pin 35 • 12-bit ADC</span>
+            </div>
+          </div>
+          <span class="status-chip chip-normal" id="soilChip">MOIST</span>
+        </div>
+
+        <div class="metric-hero-value">
+          <span class="primary-number mono" id="soilValue">1,400</span>
+          <span class="unit-label">ADC</span>
+        </div>
+        <div class="secondary-estimate" id="soilPercentEstimate">≈ 34.2% Volumetric Moisture</div>
+
+        <!-- Progress Gauge Bar with Threshold Pointer -->
+        <div class="gauge-bar-wrapper">
+          <div class="gauge-track">
+            <div class="gauge-fill gauge-fill-soil" id="soilBarFill" style="width: 34%;"></div>
+            <div class="threshold-marker marker-soil" id="soilMarker" style="left: 34%;" title="Pump On Threshold (1400 ADC)">
+              <span class="marker-flag">1400</span>
+            </div>
+          </div>
+          <div class="gauge-scale-labels">
+            <span>0 (Dry Soil)</span>
+            <span>Threshold: 1400</span>
+            <span>4095 (Saturated)</span>
+          </div>
+        </div>
+
+        <div class="metric-footer-note" id="soilDecisionNote">
+          <span class="bullet-dot"></span> Pump activates if Soil &lt; 1400
+        </div>
+      </article>
+
+      <!-- CARD 3: TEMPERATURE (DHT22 PIN 15) -->
+      <article class="metric-card metric-card-temp" id="cardTemp">
+        <div class="card-top">
+          <div class="metric-meta">
+            <div class="metric-icon-wrap icon-rose">
+              <svg viewBox="0 0 24 24" width="22" height="22" stroke="currentColor" stroke-width="2" fill="none">
+                <path d="M14 14.76V3.5a2.5 2.5 0 0 0-5 0v11.26a4.5 4.5 0 1 0 5 0z"></path>
+              </svg>
+            </div>
+            <div>
+              <h3>Ambient Temperature</h3>
+              <span class="pin-tag">DHT22 Digital Pin 15</span>
+            </div>
+          </div>
+          <button class="unit-toggle-btn" id="tempUnitBtn" title="Switch °C / °F">°C</button>
+        </div>
+
+        <div class="metric-hero-value">
+          <span class="primary-number mono" id="tempValue">28.4</span>
+          <span class="unit-label" id="tempUnitLabel">°C</span>
+        </div>
+        <div class="secondary-estimate" id="tempSecondary">Normal Growing Range (18 - 32°C)</div>
+
+        <!-- Progress Gauge Bar with Threshold Pointer -->
+        <div class="gauge-bar-wrapper">
+          <div class="gauge-track">
+            <div class="gauge-fill gauge-fill-temp" id="tempBarFill" style="width: 56%;"></div>
+            <div class="threshold-marker marker-temp" id="tempMarker" style="left: 70%;" title="Overheat Threshold (35.0 °C)">
+              <span class="marker-flag">35.0°C</span>
+            </div>
+          </div>
+          <div class="gauge-scale-labels">
+            <span>0°C (Freeze)</span>
+            <span>Threshold: 35.0°C</span>
+            <span>50°C (Extreme)</span>
+          </div>
+        </div>
+
+        <div class="metric-footer-note" id="tempDecisionNote">
+          <span class="bullet-dot"></span> Shade closes if Temp &gt; 35.0°C
+        </div>
+      </article>
+
+      <!-- CARD 4: HUMIDITY (DHT22 PIN 15) -->
+      <article class="metric-card metric-card-humidity" id="cardHumidity">
+        <div class="card-top">
+          <div class="metric-meta">
+            <div class="metric-icon-wrap icon-sky">
+              <svg viewBox="0 0 24 24" width="22" height="22" stroke="currentColor" stroke-width="2" fill="none">
+                <path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"></path>
+              </svg>
+            </div>
+            <div>
+              <h3>Relative Humidity</h3>
+              <span class="pin-tag">DHT22 Digital Pin 15</span>
+            </div>
+          </div>
+          <span class="status-chip chip-normal" id="humidityChip">OPTIMAL</span>
+        </div>
+
+        <div class="metric-hero-value">
+          <span class="primary-number mono" id="humidityValue">55.0</span>
+          <span class="unit-label">% RH</span>
+        </div>
+        <div class="secondary-estimate" id="vpdEstimate">Vapor Deficit (VPD): ~1.2 kPa</div>
+
+        <!-- Progress Gauge Bar -->
+        <div class="gauge-bar-wrapper">
+          <div class="gauge-track">
+            <div class="gauge-fill gauge-fill-humidity" id="humidityBarFill" style="width: 55%;"></div>
+          </div>
+          <div class="gauge-scale-labels">
+            <span>0% (Arid)</span>
+            <span>Comfort: 40-70%</span>
+            <span>100% (Saturated)</span>
+          </div>
+        </div>
+
+        <div class="metric-footer-note">
+          <span class="bullet-dot"></span> Influences Plant Transpiration Rate
+        </div>
+      </article>
+    </section>
+
+    <!-- WOKWI LIVE TWO-WAY REMOTE CONTROLLER -->
+    <section class="remote-control-deck-card" id="remoteControlDeck">
+      <div class="card-header-flex">
+        <div class="stage-title-wrap">
+          <span class="badge-pill remote-badge" id="remoteModeBadge">TWO-WAY CONTROL ACTIVE</span>
+          <h2>Wokwi Live Remote Command Center</h2>
+        </div>
+        <div class="remote-status-strip">
+          <div class="remote-ping-badge" id="remotePingBadge">
+            <span class="ping-dot" id="pingDot"></span>
+            <span id="pingText">Ready to Command Wokwi</span>
+          </div>
+          <div class="active-mode-indicator" id="activeModeIndicator">
+            <span class="mode-tag tag-auto" id="modeTag">MODE: AUTO</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="remote-deck-body">
+        <!-- SYSTEM MODE SELECTION -->
+        <div class="remote-mode-bar">
+          <div class="mode-bar-label">
+            <strong>System Control Mode:</strong>
+            <span class="mode-hint" id="modeHint">ESP32 autonomously reacts to Wokwi sensors (LDR & DHT22)</span>
+          </div>
+          <div class="mode-toggle-group">
+            <button class="remote-mode-btn active" id="btnSetAutoMode" title="ESP32 autonomously controls servo and pump using sensor thresholds">
+              <span class="btn-icon">🤖</span> Autonomous (Sensors)
+            </button>
+            <button class="remote-mode-btn" id="btnSetManualMode" title="Take direct manual control of Wokwi actuators from this webpage">
+              <span class="btn-icon">🕹️</span> Webpage Manual Override
+            </button>
+          </div>
+        </div>
+
+        <!-- TWO COLUMN CONTROL GRID: CANOPY SERVO & PUMP -->
+        <div class="remote-columns-grid">
+          
+          <!-- COLUMN 1: REMOTE CANOPY SERVO CONTROL -->
+          <div class="remote-col-card">
+            <div class="remote-col-header">
+              <div class="col-icon-wrap icon-purple">
+                <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none">
+                  <circle cx="12" cy="12" r="10"></circle>
+                  <polygon points="12 8 8 12 12 16 12 8"></polygon>
+                </svg>
+              </div>
+              <div>
+                <h4>Canopy Awning Servo (Pin 18)</h4>
+                <span class="col-sub">Direct PWM Angle Control &bull; Wokwi Virtual Servo</span>
+              </div>
+              <span class="angle-badge mono" id="cmdAngleBadge">0°</span>
+            </div>
+
+            <!-- Servo Angle Slider -->
+            <div class="remote-slider-wrap">
+              <div class="remote-slider-labels">
+                <span>0° (Retracted)</span>
+                <span>45°</span>
+                <span>90° (Shielded)</span>
+                <span>180° (Full)</span>
+              </div>
+              <input type="range" id="remoteServoSlider" min="0" max="180" step="5" value="0">
+            </div>
+
+            <!-- Quick Preset Action Buttons -->
+            <div class="quick-command-actions">
+              <button class="cmd-pill-btn" data-angle="0">
+                <span>☀️ Open (0°)</span>
+              </button>
+              <button class="cmd-pill-btn" data-angle="45">
+                <span>⛅ Half (45°)</span>
+              </button>
+              <button class="cmd-pill-btn" data-angle="90">
+                <span>🛡️ Deploy (90°)</span>
+              </button>
+              <button class="cmd-pill-btn" data-angle="180">
+                <span>⛱️ Max (180°)</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- COLUMN 2: REMOTE IRRIGATION PUMP CONTROL -->
+          <div class="remote-col-card">
+            <div class="remote-col-header">
+              <div class="col-icon-wrap icon-blue">
+                <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none">
+                  <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+                </svg>
+              </div>
+              <div>
+                <h4>Irrigation Drip Pump (Pin 19)</h4>
+                <span class="col-sub">Digital GPIO Relay &bull; Blue LED in Wokwi</span>
+              </div>
+              <span class="pump-state-badge" id="cmdPumpBadge">OFF</span>
+            </div>
+
+            <!-- Big Glowing Pump Command Switches -->
+            <div class="pump-command-controls">
+              <button class="pump-power-btn btn-pump-on" id="btnPumpOn">
+                <span class="pwr-icon">💧</span>
+                <div class="pwr-text">
+                  <strong>START WATER PUMP</strong>
+                  <small>Wokwi Pin 19 HIGH (LED ON)</small>
+                </div>
+              </button>
+
+              <button class="pump-power-btn btn-pump-off" id="btnPumpOff">
+                <span class="pwr-icon">⏹️</span>
+                <div class="pwr-text">
+                  <strong>STOP WATER PUMP</strong>
+                  <small>Wokwi Pin 19 LOW (LED OFF)</small>
+                </div>
+              </button>
+            </div>
+
+            <div class="col-footer-action">
+              <button class="btn-push-thresh" id="btnPushThreshToWokwi" title="Send dashboard threshold calibrations to Wokwi ESP32">
+                <span>⚙️ Push Calibrated Thresholds to Wokwi</span>
+              </button>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </section>
+
+    <!-- ACTUATOR STATUS & LOGIC REASONING CARDS -->
+    <section class="actuators-grid">
+      
+      <!-- ACTUATOR 1: CANOPY SERVO (PIN 18) -->
+      <div class="actuator-card" id="actuatorCanopyCard">
+        <div class="actuator-header">
+          <div class="actuator-title-grp">
+            <div class="actuator-icon-halo halo-purple">
+              <svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" fill="none">
+                <circle cx="12" cy="12" r="10"></circle>
+                <polygon points="12 8 8 12 12 16 12 8"></polygon>
+                <line x1="16" y1="12" x2="12" y2="12"></line>
+              </svg>
+            </div>
+            <div>
+              <h3>Canopy Shade Servo Motor</h3>
+              <span class="pin-tag">ESP32 Pin 18 (PWM 50Hz) • SG90/MG996R</span>
+            </div>
+          </div>
+          <div class="actuator-state-pill" id="canopyStatePill">OPEN</div>
+        </div>
+
+        <div class="actuator-body-flex">
+          <div class="servo-angle-dial">
+            <div class="dial-track">
+              <div class="dial-needle" id="servoNeedle" style="transform: rotate(0deg);"></div>
+              <div class="dial-hub"></div>
+            </div>
+            <div class="dial-readout">
+              <span class="dial-degree mono" id="servoAngleReadout">0°</span>
+              <span class="dial-sub">PWM Angle</span>
+            </div>
+          </div>
+
+          <div class="actuator-details">
+            <div class="logic-rule-box">
+              <span class="logic-title">FIRMWARE DECISION LOGIC:</span>
+              <code class="logic-code">shadeClosed = (light &gt; 2500) || (temp &gt; 35.0);</code>
+            </div>
+            
+            <div class="trigger-breakdown">
+              <div class="trigger-row" id="trigLightRow">
+                <span class="trig-icon" id="trigLightIcon">⚪</span>
+                <span class="trig-lbl">Sunlight &gt; 2500 ADC:</span>
+                <span class="trig-val mono" id="trigLightVal">FALSE (2500)</span>
+              </div>
+              <div class="trigger-row" id="trigTempRow">
+                <span class="trig-icon" id="trigTempIcon">⚪</span>
+                <span class="trig-lbl">Temperature &gt; 35.0 °C:</span>
+                <span class="trig-val mono" id="trigTempVal">FALSE (28.4°C)</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ACTUATOR 2: WATER PUMP RELAY (PIN 19) -->
+      <div class="actuator-card" id="actuatorPumpCard">
+        <div class="actuator-header">
+          <div class="actuator-title-grp">
+            <div class="actuator-icon-halo halo-blue">
+              <svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" fill="none">
+                <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+              </svg>
+            </div>
+            <div>
+              <h3>Irrigation Drip Pump Relay</h3>
+              <span class="pin-tag">ESP32 Pin 19 (Digital Out) • 5V Relay / LED</span>
+            </div>
+          </div>
+          <div class="actuator-state-pill" id="pumpStatePill">OFF</div>
+        </div>
+
+        <div class="actuator-body-flex">
+          <div class="pump-motor-visual">
+            <div class="pump-spin-ring" id="pumpSpinRing">
+              <div class="pump-blade-bar b1"></div>
+              <div class="pump-blade-bar b2"></div>
+            </div>
+            <div class="pump-flow-readout">
+              <span class="flow-status mono" id="pumpFlowStatus">STANDBY</span>
+              <span class="flow-sub">Drip Flow</span>
+            </div>
+          </div>
+
+          <div class="actuator-details">
+            <div class="logic-rule-box">
+              <span class="logic-title">FIRMWARE DECISION LOGIC:</span>
+              <code class="logic-code">pumpOn = (soil &lt; 1400);</code>
+            </div>
+            
+            <div class="trigger-breakdown">
+              <div class="trigger-row" id="trigSoilRow">
+                <span class="trig-icon" id="trigSoilIcon">⚪</span>
+                <span class="trig-lbl">Soil Moisture &lt; 1400 ADC:</span>
+                <span class="trig-val mono" id="trigSoilVal">FALSE (1400)</span>
+              </div>
+              <div class="trigger-row">
+                <span class="trig-icon">ℹ️</span>
+                <span class="trig-lbl">Protection Mode:</span>
+                <span class="trig-val">Auto-Drip Active</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- INTERACTIVE SIMULATION TESTBED & PRESET SCENARIOS -->
+    <section class="simulator-deck-card" id="simulatorDeckCard">
+      <div class="card-header-flex">
+        <div class="stage-title-wrap">
+          <span class="badge-pill sim-badge">PHYSICS SIMULATOR TESTBED</span>
+          <h2>Interactive Sensor Controls & Scenarios</h2>
+        </div>
+        <div class="sim-deck-actions">
+          <label class="toggle-switch-label" title="Continuously broadcast simulated sensor packets to HiveMQ MQTT">
+            <input type="checkbox" id="chkMqttBroadcast">
+            <span class="slider-toggle"></span>
+            <span class="toggle-text">Publish Sim to HiveMQ Topic</span>
+          </label>
+          <label class="toggle-switch-label" title="Add micro-fluctuations to sensor readings">
+            <input type="checkbox" id="chkNoiseJitter" checked>
+            <span class="slider-toggle"></span>
+            <span class="toggle-text">Realistic Sensor Jitter</span>
+          </label>
+        </div>
+      </div>
+
+      <!-- Quick Preset Scenario Buttons -->
+      <div class="scenario-buttons-scroll">
+        <button class="scenario-btn" data-scenario="heatwave">
+          <span class="scen-icon">☀️🔥</span>
+          <div class="scen-text">
+            <strong>Midday Scorching Heat</strong>
+            <small>Light: 3400, Temp: 38.5°C &rarr; Canopy Closes</small>
+          </div>
+        </button>
+
+        <button class="scenario-btn" data-scenario="drought">
+          <span class="scen-icon">🏜️💧</span>
+          <div class="scen-text">
+            <strong>Arid Drought</strong>
+            <small>Soil: 820 ADC &rarr; Irrigation Pump Starts</small>
+          </div>
+        </button>
+
+        <button class="scenario-btn" data-scenario="ideal">
+          <span class="scen-icon">🌿⛅</span>
+          <div class="scen-text">
+            <strong>Ideal Mild Morning</strong>
+            <small>Light: 1800, Soil: 2400, Temp: 24.0°C &rarr; Canopy Open</small>
+          </div>
+        </button>
+
+        <button class="scenario-btn" data-scenario="storm">
+          <span class="scen-icon">🌧️🌙</span>
+          <div class="scen-text">
+            <strong>Night Rainstorm</strong>
+            <small>Light: 350, Soil: 3800, Temp: 19.5°C &rarr; Everything Idle</small>
+          </div>
+        </button>
+
+        <button class="scenario-btn" data-scenario="critical">
+          <span class="scen-icon">🚨⚡</span>
+          <div class="scen-text">
+            <strong>Emergency Combo</strong>
+            <small>Light: 3950, Temp: 42°C, Soil: 600 &rarr; Canopy + Pump</small>
+          </div>
+        </button>
+      </div>
+
+      <!-- Interactive Sliders Grid -->
+      <div class="sliders-control-grid">
+        <!-- Slider 1: Light LDR -->
+        <div class="slider-group">
+          <div class="slider-header">
+            <label for="rangeLight">Light Sensor (LDR Pin 34)</label>
+            <span class="slider-val-readout mono" id="simValLight">2500 ADC</span>
+          </div>
+          <input type="range" id="rangeLight" min="0" max="4095" step="10" value="2500">
+          <div class="slider-ticks">
+            <span>0 (Dark)</span>
+            <span class="tick-threshold">Threshold: 2500</span>
+            <span>4095 (Max)</span>
+          </div>
+        </div>
+
+        <!-- Slider 2: Soil Moisture -->
+        <div class="slider-group">
+          <div class="slider-header">
+            <label for="rangeSoil">Soil Moisture (Pin 35)</label>
+            <span class="slider-val-readout mono" id="simValSoil">1400 ADC</span>
+          </div>
+          <input type="range" id="rangeSoil" min="0" max="4095" step="10" value="1400">
+          <div class="slider-ticks">
+            <span>0 (Dry)</span>
+            <span class="tick-threshold">Threshold: 1400</span>
+            <span>4095 (Wet)</span>
+          </div>
+        </div>
+
+        <!-- Slider 3: Temperature -->
+        <div class="slider-group">
+          <div class="slider-header">
+            <label for="rangeTemp">Temperature (DHT22 Pin 15)</label>
+            <span class="slider-val-readout mono" id="simValTemp">28.4 °C</span>
+          </div>
+          <input type="range" id="rangeTemp" min="-5" max="55" step="0.5" value="28.4">
+          <div class="slider-ticks">
+            <span>-5°C</span>
+            <span class="tick-threshold">Threshold: 35.0°C</span>
+            <span>55°C</span>
+          </div>
+        </div>
+
+        <!-- Slider 4: Humidity -->
+        <div class="slider-group">
+          <div class="slider-header">
+            <label for="rangeHumidity">Humidity (DHT22 Pin 15)</label>
+            <span class="slider-val-readout mono" id="simValHumidity">55.0 %</span>
+          </div>
+          <input type="range" id="rangeHumidity" min="0" max="100" step="1" value="55">
+          <div class="slider-ticks">
+            <span>0% (Arid)</span>
+            <span>50%</span>
+            <span>100% (Dense)</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- REAL-TIME TELEMETRY CHARTS SECTION -->
+    <section class="charts-section-grid">
+      
+      <!-- Chart 1: Solar & Soil Moisture (ADC Scales) -->
+      <div class="chart-card">
+        <div class="chart-card-header">
+          <div>
+            <h3>Solar Radiance & Soil Moisture History</h3>
+            <span class="chart-sub">12-bit Analog Range (0 - 4095 ADC) with Threshold Guides</span>
+          </div>
+          <div class="chart-legend-pills">
+            <span class="leg-pill leg-amber">● Light (LDR)</span>
+            <span class="leg-pill leg-emerald">● Soil Moisture</span>
+          </div>
+        </div>
+        <div class="chart-canvas-wrap">
+          <canvas id="analogChart"></canvas>
+        </div>
+      </div>
+
+      <!-- Chart 2: Temperature & Humidity (DHT22) -->
+      <div class="chart-card">
+        <div class="chart-card-header">
+          <div>
+            <h3>Microclimate Temperature & Humidity</h3>
+            <span class="chart-sub">DHT22 Telemetry Stream (°C and % RH)</span>
+          </div>
+          <div class="chart-legend-pills">
+            <span class="leg-pill leg-rose">● Temperature (°C)</span>
+            <span class="leg-pill leg-sky">● Humidity (%)</span>
+          </div>
+        </div>
+        <div class="chart-canvas-wrap">
+          <canvas id="climateChart"></canvas>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- LIVE TELEMETRY PACKET FEED & TERMINAL LOG -->
+    <section class="terminal-feed-card">
+      <div class="terminal-header">
+        <div class="terminal-title">
+          <span class="term-dot dot-red"></span>
+          <span class="term-dot dot-yellow"></span>
+          <span class="term-dot dot-green"></span>
+          <span class="term-name">ESP32 Live MQTT Telemetry Stream</span>
+        </div>
+        <div class="terminal-actions">
+          <span class="packet-count" id="packetCountBadge">Packets: 0</span>
+          <button id="btnClearLog" class="term-btn" title="Clear Console">Clear</button>
+          <button id="btnCopyJson" class="term-btn" title="Copy Latest JSON">Copy JSON</button>
+        </div>
+      </div>
+      <div class="terminal-body" id="terminalBody">
+        <div class="term-line term-system">System booted. Subscribed to topic: smartcanopy/demo-7f3a9c/telemetry</div>
+        <div class="term-line term-system">Waiting for telemetry frames...</div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- FOOTER -->
+  <footer class="app-footer">
+    <div class="footer-content">
+      <div class="footer-left">
+        <strong>Smart Shadow Canopy OS</strong> &bull; ESP32 IoT Agriculture Control Platform
+      </div>
+      <div class="footer-right">
+        MQTT Broker: <code>broker.hivemq.com:8884/mqtt (WSS)</code> &bull; Topic: <code>smartcanopy/demo-7f3a9c/telemetry</code>
+      </div>
+    </div>
+  </footer>
+
+  <!-- ================= MODALS ================= -->
+
+  <!-- 1. WOKWI & HARDWARE SETUP GUIDE MODAL -->
+  <div class="modal-backdrop" id="modalWokwi" hidden>
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <h3>⚡ ESP32 & Wokwi Simulation Setup</h3>
+        <button class="modal-close" data-close="modalWokwi">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p class="modal-lead">You can run the real ESP32 code inside the free online <strong>Wokwi Simulator</strong> with zero hardware needed! It connects to HiveMQ and streams live directly into this dashboard.</p>
+        
+        <h4>Step 1: Open Wokwi ESP32 Project</h4>
+        <ol class="setup-steps">
+          <li>Go to <a href="https://wokwi.com/projects/new/esp32" target="_blank" rel="noopener">wokwi.com/projects/new/esp32</a>.</li>
+          <li>In <code>sketch.ino</code>, paste the provided ESP32 firmware code.</li>
+          <li>In <code>diagram.json</code> tab (or press F1 &gt; View diagram.json), paste the canopy wiring JSON below.</li>
+        </ol>
+
+        <h4>Step 2: Install Libraries in Wokwi (diagram.json)</h4>
+        <p>In Wokwi's "Library Manager" tab, search and add:</p>
+        <ul class="lib-list">
+          <li><code>PubSubClient</code> by Nick O'Leary</li>
+          <li><code>DHT sensor library</code> by Adafruit</li>
+          <li><code>ESP32Servo</code> by Kevin Harrington</li>
+        </ul>
+
+        <h4>Step 3: Hardware Pinout Wiring Summary</h4>
+        <table class="pin-table">
+          <thead>
+            <tr><th>Component</th><th>ESP32 Pin</th><th>Type</th><th>Purpose</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>LDR (Photoresistor)</td><td>GPIO 34</td><td>Analog ADC</td><td>Measures ambient sunlight intensity (0 - 4095)</td></tr>
+            <tr><td>Soil Moisture / Potentiometer</td><td>GPIO 35</td><td>Analog ADC</td><td>Measures soil hydration (0 - 4095)</td></tr>
+            <tr><td>DHT22 Temp & Humidity</td><td>GPIO 15</td><td>Digital I/O</td><td>Monitors greenhouse microclimate</td></tr>
+            <tr><td>Servo Motor (Awning)</td><td>GPIO 18</td><td>PWM (50Hz)</td><td>Deploys shade canopy: 0° (Open) &bull; 90° (Closed)</td></tr>
+            <tr><td>Water Pump / Blue LED</td><td>GPIO 19</td><td>Digital Out</td><td>Irrigation valve / virtual drip pump</td></tr>
+          </tbody>
+        </table>
+
+        <h4>Wokwi diagram.json (Copy & Paste)</h4>
+        <div class="code-copy-box">
+          <pre id="wokwiJsonContent">{
+  "version": 1,
+  "author": "Smart Canopy Team",
+  "editor": "wokwi",
+  "parts": [
+    { "type": "board-esp32-devkit-c-v4", "id": "esp", "top": 0, "left": 0, "attrs": {} },
+    { "type": "wokwi-photoresistor-sensor", "id": "ldr", "top": -140, "left": -120, "attrs": {} },
+    { "type": "wokwi-potentiometer", "id": "soil_pot", "top": 120, "left": -150, "attrs": { "label": "Soil Moisture" } },
+    { "type": "wokwi-dht22", "id": "dht", "top": -140, "left": 140, "attrs": { "temperature": "28", "humidity": "55" } },
+    { "type": "wokwi-servo", "id": "servo", "top": 120, "left": 140, "attrs": {} },
+    { "type": "wokwi-led", "id": "pump_led", "top": 240, "left": 0, "attrs": { "color": "blue", "label": "PUMP" } },
+    { "type": "wokwi-resistor", "id": "r_pump", "top": 200, "left": 0, "attrs": { "value": "220" } }
+  ],
+  "connections": [
+    [ "esp:TX", "$serial:rx", "", [] ],
+    [ "esp:RX", "$serial:tx", "", [] ],
+    [ "esp:3V3", "ldr:VCC", "red", [ "v0" ] ],
+    [ "esp:GND.1", "ldr:GND", "black", [ "v0" ] ],
+    [ "esp:34", "ldr:AO", "green", [ "v0" ] ],
+    [ "esp:3V3", "soil_pot:VCC", "red", [ "v0" ] ],
+    [ "esp:GND.2", "soil_pot:GND", "black", [ "v0" ] ],
+    [ "esp:35", "soil_pot:SIG", "orange", [ "v0" ] ],
+    [ "esp:3V3", "dht:VCC", "red", [ "v0" ] ],
+    [ "esp:GND.1", "dht:GND", "black", [ "v0" ] ],
+    [ "esp:15", "dht:SDA", "yellow", [ "v0" ] ],
+    [ "esp:5V", "servo:V+", "red", [ "v0" ] ],
+    [ "esp:GND.2", "servo:GND", "black", [ "v0" ] ],
+    [ "esp:18", "servo:PWM", "purple", [ "v0" ] ],
+    [ "esp:19", "r_pump:1", "blue", [ "v0" ] ],
+    [ "r_pump:2", "pump_led:A", "blue", [ "v0" ] ],
+    [ "esp:GND.2", "pump_led:C", "black", [ "v0" ] ]
+  ],
+  "dependencies": {}
+}</pre>
+          <button class="btn-copy-code" id="btnCopyWokwiJson">Copy diagram.json</button>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-primary" data-close="modalWokwi">Done</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 2. MQTT BROKER SETTINGS MODAL -->
+  <div class="modal-backdrop" id="modalMqtt" hidden>
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <h3>📡 MQTT Broker Connection Settings</h3>
+        <button class="modal-close" data-close="modalMqtt">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p>Adjust MQTT broker parameters to match your custom device or private server.</p>
+        <div class="form-group">
+          <label for="cfgMqttHost">WebSocket Broker Host</label>
+          <input type="text" id="cfgMqttHost" value="broker.hivemq.com">
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label for="cfgMqttPort">WSS Port</label>
+            <input type="number" id="cfgMqttPort" value="8884">
+          </div>
+          <div class="form-group">
+            <label for="cfgMqttPath">WS Path</label>
+            <input type="text" id="cfgMqttPath" value="/mqtt">
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="cfgMqttTopic">Telemetry Topic</label>
+          <input type="text" id="cfgMqttTopic" value="smartcanopy/demo-7f3a9c/telemetry">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secondary" id="btnResetMqtt">Reset to Defaults</button>
+        <button class="btn-primary" id="btnSaveMqtt">Save & Reconnect</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 3. THRESHOLD CALIBRATION MODAL -->
+  <div class="modal-backdrop" id="modalCalibrate" hidden>
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <h3>⚙️ Threshold Calibration & Decision Rules</h3>
+        <button class="modal-close" data-close="modalCalibrate">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p>Calibrate system actuation thresholds to match your specific crop species and environment.</p>
+        <div class="form-group">
+          <label for="cfgThreshLight">Sunlight Canopy Threshold (ADC)</label>
+          <input type="number" id="cfgThreshLight" value="2500" min="500" max="4000">
+          <small>Canopy closes when LDR &gt; this value</small>
+        </div>
+        <div class="form-group">
+          <label for="cfgThreshTemp">Temperature Canopy Threshold (°C)</label>
+          <input type="number" id="cfgThreshTemp" value="35.0" step="0.5" min="20" max="50">
+          <small>Canopy closes when Temp &gt; this value to prevent heat stress</small>
+        </div>
+        <div class="form-group">
+          <label for="cfgThreshSoil">Soil Irrigation Threshold (ADC)</label>
+          <input type="number" id="cfgThreshSoil" value="1400" min="200" max="3500">
+          <small>Pump activates when Soil &lt; this value</small>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secondary" id="btnResetCalib">Reset Defaults</button>
+        <button class="btn-primary" id="btnSaveCalib">Apply Thresholds</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Audio Chimes AudioContext elements handled via JS Web Audio API -->
+  <script src="app.js"></script>
+</body>
+</html>

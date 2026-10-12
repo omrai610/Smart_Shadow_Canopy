@@ -1,0 +1,34 @@
+{
+  "version": 1,
+  "author": "Smart Canopy Team",
+  "editor": "wokwi",
+  "parts": [
+    { "type": "board-esp32-devkit-c-v4", "id": "esp", "top": 0, "left": 0, "attrs": {} },
+    { "type": "wokwi-photoresistor-sensor", "id": "ldr", "top": -140, "left": -120, "attrs": {} },
+    { "type": "wokwi-potentiometer", "id": "soil_pot", "top": 120, "left": -150, "attrs": { "label": "Soil Moisture" } },
+    { "type": "wokwi-dht22", "id": "dht", "top": -140, "left": 140, "attrs": { "temperature": "28", "humidity": "55" } },
+    { "type": "wokwi-servo", "id": "servo", "top": 120, "left": 140, "attrs": {} },
+    { "type": "wokwi-led", "id": "pump_led", "top": 240, "left": 0, "attrs": { "color": "blue", "label": "PUMP" } },
+    { "type": "wokwi-resistor", "id": "r_pump", "top": 200, "left": 0, "attrs": { "value": "220" } }
+  ],
+  "connections": [
+    [ "esp:TX", "$serial:rx", "", [] ],
+    [ "esp:RX", "$serial:tx", "", [] ],
+    [ "esp:3V3", "ldr:VCC", "red", [ "v0" ] ],
+    [ "esp:GND.1", "ldr:GND", "black", [ "v0" ] ],
+    [ "esp:34", "ldr:AO", "green", [ "v0" ] ],
+    [ "esp:3V3", "soil_pot:VCC", "red", [ "v0" ] ],
+    [ "esp:GND.2", "soil_pot:GND", "black", [ "v0" ] ],
+    [ "esp:35", "soil_pot:SIG", "orange", [ "v0" ] ],
+    [ "esp:3V3", "dht:VCC", "red", [ "v0" ] ],
+    [ "esp:GND.1", "dht:GND", "black", [ "v0" ] ],
+    [ "esp:15", "dht:SDA", "yellow", [ "v0" ] ],
+    [ "esp:5V", "servo:V+", "red", [ "v0" ] ],
+    [ "esp:GND.2", "servo:GND", "black", [ "v0" ] ],
+    [ "esp:18", "servo:PWM", "purple", [ "v0" ] ],
+    [ "esp:19", "r_pump:1", "blue", [ "v0" ] ],
+    [ "r_pump:2", "pump_led:A", "blue", [ "v0" ] ],
+    [ "esp:GND.2", "pump_led:C", "black", [ "v0" ] ]
+  ],
+  "dependencies": {}
+}
